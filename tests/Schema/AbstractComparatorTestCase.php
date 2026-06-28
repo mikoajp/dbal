@@ -23,6 +23,7 @@ use Doctrine\DBAL\Schema\Sequence;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\Tests\Functional\Platform\RenameColumnTest;
+use Doctrine\DBAL\Types\Exception\TypesException;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Deprecations\PHPUnit\VerifyDeprecations;
@@ -636,7 +637,7 @@ abstract class AbstractComparatorTestCase extends TestCase
         );
     }
 
-    public function testCompareForeignKeyBasedOnPropertiesNotName(): void
+    public function testDetectForeignKeyNameChange(): void
     {
         $tableA = Table::editor()
             ->setUnquotedName('foo')
@@ -656,14 +657,7 @@ abstract class AbstractComparatorTestCase extends TestCase
             )
             ->create();
 
-        $tableB = Table::editor()
-            ->setUnquotedName('foo')
-            ->setColumns(
-                Column::editor()
-                    ->setUnquotedName('ID')
-                    ->setTypeName(Types::INTEGER)
-                    ->create(),
-            )
+        $tableB = $tableA->edit()
             ->setForeignKeyConstraints(
                 ForeignKeyConstraint::editor()
                     ->setUnquotedName('bar_constraint')
@@ -674,10 +668,10 @@ abstract class AbstractComparatorTestCase extends TestCase
             )
             ->create();
 
-        self::assertEquals(
-            new TableDiff($tableA),
-            $this->comparator->compareTables($tableA, $tableB),
-        );
+        $tableDiff = $this->comparator->compareTables($tableA, $tableB);
+
+        self::assertCount(1, $tableDiff->getDroppedForeignKeyConstraintNames());
+        self::assertCount(1, $tableDiff->getAddedForeignKeys());
     }
 
     public function testDetectRenameColumn(): void
@@ -1455,4 +1449,5 @@ abstract class AbstractComparatorTestCase extends TestCase
             ->setUnquotedName($name)
             ->create();
     }
+
 }
